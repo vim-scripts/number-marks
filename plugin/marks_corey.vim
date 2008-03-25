@@ -202,6 +202,7 @@ fun! s:Flash_signs()
       silent! exe 'sign place ' . item[0] . ' line=' . item[1] . ' name=CS'. item[0] . ' file=' . item[2]
     endfor
   endif
+  let  s:Cs_sign_number = s:mylist[len(s:mylist) - 1][0] * 1 + 1 
   "let s:myIndex = 1 ##you don't need reset the pointer
 endfun
 
