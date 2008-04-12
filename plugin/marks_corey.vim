@@ -1,6 +1,6 @@
 " Vim plugin for showing marks using number array.
 " Maintainer: Hongli Gao <left.slipper at gmail dot com>
-" Last Change: 2008 March 20
+" Last Change: 2008 April 12
 "
 " USAGE:
 " Copy this file to your vim's plugin folder.
@@ -15,6 +15,11 @@
 " move to next mark:                           
 "                            F2
 "                            mb
+" moving a mark:
+"                            m.
+"  (press m. to mark a mark, and move the cursor to new line, 
+"   press the m. again, you can moving a mark.)
+"
 " delete all marks:
 "                            F4
 " If you want to save the marks to a file. Do it like below:
@@ -24,6 +29,9 @@
 "
 " :call Save_signs_to_file()   # Save marks.
 " :call Load_signs_from_file() # Do this, after opening all your marked files
+"
+" copyright (c) 2008 Hongli Gao; 
+" Distributed under the GNU General Public License.
 " ---------------------------------------------------------------------
 
 if !has("signs")
@@ -43,6 +51,7 @@ let s:myIndex = 1
 let s:tmplist = ["00","0","corey"]
 let s:deleteFlag = 0
 let s:outputFileName = "DO_NOT_DELETE_IT"
+let s:remarkItem = ["REMARK","SEARCH","FLAG"]
 
 " ---------------------------------------------------------------------
 " put on one sign
@@ -104,7 +113,7 @@ fun! Goto_prev_sign()
     if s:myIndex <= 0
       let s:myIndex = len(s:mylist) - 1
     endif
-    call s:Sign_jump(s:mylist[s:myIndex][0], s:mylist[s:myIndex][2])
+    call s:Sign_jump(s:mylist[s:myIndex])
   endif
 endfun
 
@@ -118,7 +127,7 @@ fun! Goto_next_sign()
     if ((s:myIndex >= len(s:mylist)) || (s:myIndex == 1))
       let s:myIndex = 1
     endif
-    call s:Sign_jump(s:mylist[s:myIndex][0], s:mylist[s:myIndex][2])
+    call s:Sign_jump(s:mylist[s:myIndex])
   endif
 endfun
 " ---------------------------------------------------------------------
@@ -165,12 +174,6 @@ fun! s:Get_signs_file_name()
   if exists("g:Signs_file_path_corey")
     let s:outputFileName = g:Signs_file_path_corey . "_DO_NOT_DELETE_IT"
   endif
-endfun
-
-" ---------------------------------------------------------------------
-fun! s:Sign_jump(aSignID, aFileName)
-
-  silent! exe 'sign jump '. a:aSignID . ' file='. a:aFileName
 endfun
 
 " ---------------------------------------------------------------------
@@ -237,6 +240,126 @@ fun! s:Check_list(aItem)
 endfun
 
 " ---------------------------------------------------------------------
+" Move_sign
+fun! Move_sign()
+
+  let s:tempItem = ["","",""]
+  let vRLn = "".line(".")
+  let vRFileName = expand("%:p")
+
+  let s:tempItem[1] = vRLn
+  let s:tempItem[2] = vRFileName
+  "echo s:tempItem
+  let vRIndex = s:Check_list(s:tempItem)
+
+  if (s:remarkItem[0] ==# "REMARK" )
+    if vRIndex > 0
+      silent! exe 'sign define CS' . s:mylist[vRIndex][0] . ' text='. s:mylist[vRIndex][0] .' texthl=Search'
+      silent! exe 'sign place ' . s:mylist[vRIndex][0] . ' line=' . vRLn . ' name=CS'. s:mylist[vRIndex][0] . ' file=' . vRFileName
+      let s:remarkItem = s:mylist[vRIndex]
+      let s:myIndex = vRIndex
+      "echo s:remarkItem
+    endif
+  else
+    let pionter = s:Check_list(s:remarkItem)
+    "echo vRIndex ."|" .pionter
+    if ((vRIndex < 0) && (pionter > 0))
+      silent! exe 'sign unplace ' .s:remarkItem[0] . ' file=' . s:remarkItem[2]
+      "silent! exe 'sign undefine' .s:remarkItem[0]
+      silent! exe 'sign define CS' . s:remarkItem[0] . ' text='. s:remarkItem[0] .' texthl=ErrorMsg'
+      silent! exe 'sign place ' . s:remarkItem[0] . ' line=' . vRLn . ' name=CS' . s:remarkItem[0] . ' file=' . vRFileName
+      let s:mylist[pionter][1] = vRLn
+      let s:mylist[pionter][2] = vRFileName
+      "echo s:mylist[pionter]
+      let s:myIndex = pionter
+      let s:remarkItem = ["REMARK","SEARCH","FLAG"]
+    endif
+  endif
+endfun
+
+" -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+" all of them used for the jump.
+fun! s:Sign_jump(aSignItem)
+  let bufferList = s:GetBufferList()
+  "echo bufferList
+  let bufferExits = s:Seach_file(a:aSignItem[2], bufferList)
+
+  if bufferExits > 0
+    silent! exe 'tabn ' . bufferExits
+    silent! exe 'sign jump '. a:aSignItem[0] . ' file='. a:aSignItem[2]
+  else
+    call s:Open_file(a:aSignItem[2])
+
+    silent! exe 'sign place ' . a:aSignItem[0] . ' line=' . a:aSignItem[1] . ' name=CS'. a:aSignItem[0] . ' file=' . a:aSignItem[2]
+
+    silent! exe 'sign jump '. a:aSignItem[0] . ' file='. a:aSignItem[2]
+  endif
+
+endfun
+
+" ---------------------------------------------------------------------
+" get buffer list
+fun! s:GetBufferList()
+
+  let vResult = [["0","[ * THE <?> HEAD * ]"]]
+  let i = 0
+
+  while i < tabpagenr('$')
+
+    if i == 0
+      silent! exe 'tabfirst'
+    else
+      silent! exe 'tabnext'
+    endif
+    let bufname = expand("%:p")
+    let vResult = vResult + [[i + 1, bufname]]
+    let i = i + 1
+  endwhile
+
+  return vResult
+endfun
+
+" ---------------------------------------------------------------------
+" open file
+fun! s:Open_file(aFileName)
+  if filereadable(a:aFileName)
+    "call s:Flash_signs()
+    if tabpagenr('$') > 1
+      silent! exe 'tabnew '. a:aFileName
+      silent! exe 'tabn ' . tabpagenr('$')
+    else
+      silent! exe 'e '. a:aFileName
+    endif
+  endif
+endfun
+" ---------------------------------------------------------------------
+" search file
+" find the file, return the position; else return -1
+fun! s:Seach_file(aFileName, aBufferList)
+
+  let vResult = -1
+
+  if len(a:aBufferList) > 1
+    if s:win32Flag == 1
+      for item in a:aBufferList
+        " file name is ignoring case
+        if (item[1] ==? a:aFileName)
+          return item[0]
+        endif
+      endfor
+    else
+      for item in a:aBufferList
+        " file name is matching case
+        if (item[1] ==# a:aFileName)
+          return item[0]
+        endif
+      endfor
+    endif
+  endif
+  return vResult
+endfun
+
+" ---------------------------------------------------------------------
 if !hasmapto('<Plug>Place_sign')
   map <unique> <c-F2> <Plug>Place_sign
   map <silent> <unique> mm <Plug>Place_sign
@@ -259,6 +382,11 @@ if !hasmapto('<Plug>Remove_all_signs')
   map <unique> <F4> <Plug>Remove_all_signs
 endif
 nnoremap <silent> <script> <Plug>Remove_all_signs :call Remove_all_signs()<cr>
+
+if !hasmapto('<Plug>Move_sign') 
+  map <silent> <unique> m. <Plug>Move_sign
+endif
+nnoremap <silent> <script> <Plug>Move_sign :call Move_sign()<cr>
 
 " ---------------------------------------------------------------------
 
