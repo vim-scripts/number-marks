@@ -64,6 +64,8 @@ fun! Place_sign()
   if s:Cs_sign_number > 99
     echo "Sorry, you only can use these marks less 100!"
     return -1
+  else
+    let s:Cs_sign_number = (s:mylist[len(s:mylist) - 1][0] * 1) + 1
   endif
 
   let vLn = "".line(".")
@@ -79,7 +81,7 @@ fun! Place_sign()
     silent! exe 'sign define CS' . vFlagNum . ' text='. vFlagNum .' texthl=ErrorMsg'
     silent! exe 'sign place ' . vFlagNum . ' line=' . vLn . ' name=CS'. vFlagNum . ' file=' . vFileName
 
-    let s:Cs_sign_number = s:Cs_sign_number + 1
+    "let s:Cs_sign_number = s:Cs_sign_number + 1
     let s:mylist = s:mylist + [newItem]
     " record the last index.
     let s:myIndex = len(s:mylist) - 1
@@ -205,7 +207,7 @@ fun! s:Flash_signs()
       silent! exe 'sign place ' . item[0] . ' line=' . item[1] . ' name=CS'. item[0] . ' file=' . item[2]
     endfor
   endif
-  let  s:Cs_sign_number = s:mylist[len(s:mylist) - 1][0] * 1 + 1 
+  let s:Cs_sign_number = s:mylist[len(s:mylist) - 1][0] * 1 + 1
   "let s:myIndex = 1 ##you don't need reset the pointer
 endfun
 
@@ -218,23 +220,12 @@ fun! s:Check_list(aItem)
   let vResult = -1
   let index = 0
 
-  if s:win32Flag == 1
-    for item in s:mylist
-      " file name is ignoring case
-      if ((item[1] ==? a:aItem[1]) && (item[2] ==? a:aItem[2]))
-        return index
-      endif
-      let index = index + 1
-    endfor
-  else
-    for item in s:mylist
-      " file name is matching case
-      if ((item[1] ==# a:aItem[1]) && (item[2] ==# a:aItem[2]))
-        return index
-      endif
-      let index = index + 1
-    endfor
-  endif
+  for item in s:mylist
+    if ((s:Compare(item[1], a:aItem[1]) == 1) && (s:Compare(item[2],a:aItem[2]) == 1))
+      return index
+    endif
+    let index = index + 1
+  endfor
 
   return vResult
 endfun
@@ -280,28 +271,28 @@ endfun
 " -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 " all of them used for the jump.
 fun! s:Sign_jump(aSignItem)
-  let bufferList = s:GetBufferList()
-  "echo bufferList
-  let bufferExits = s:Seach_file(a:aSignItem[2], bufferList)
+  let bufferExits = s:GetTabpage(a:aSignItem)
 
   if bufferExits > 0
     silent! exe 'tabn ' . bufferExits
     silent! exe 'sign jump '. a:aSignItem[0] . ' file='. a:aSignItem[2]
   else
     call s:Open_file(a:aSignItem[2])
-
     silent! exe 'sign place ' . a:aSignItem[0] . ' line=' . a:aSignItem[1] . ' name=CS'. a:aSignItem[0] . ' file=' . a:aSignItem[2]
-
     silent! exe 'sign jump '. a:aSignItem[0] . ' file='. a:aSignItem[2]
   endif
 
 endfun
 
 " ---------------------------------------------------------------------
-" get buffer list
-fun! s:GetBufferList()
+" GetTabpage
+fun! s:GetTabpage(aSignItem)
 
-  let vResult = [["0","[ * THE <?> HEAD * ]"]]
+  let bufname = expand("%:p")
+  if s:Compare(bufname,a:aSignItem[2]) == 1
+    return tabpagenr()
+  endif
+
   let i = 0
 
   while i < tabpagenr('$')
@@ -312,11 +303,29 @@ fun! s:GetBufferList()
       silent! exe 'tabnext'
     endif
     let bufname = expand("%:p")
-    let vResult = vResult + [[i + 1, bufname]]
+
+    if s:Compare(bufname,a:aSignItem[2]) == 1
+      return i + 1
+    endif
+
     let i = i + 1
   endwhile
 
-  return vResult
+  return -1
+endfun
+" ---------------------------------------------------------------------
+" compare
+fun! s:Compare(a1,a2)
+  if s:win32Flag == 1
+    if a:a1 ==? a:a2
+      return 1
+    endif
+  else
+    if a:a1 ==# a:a2
+      return 1
+    endif
+  endif
+  return 0
 endfun
 
 " ---------------------------------------------------------------------
