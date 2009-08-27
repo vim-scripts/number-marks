@@ -1,6 +1,6 @@
 " Vim plugin for showing marks using number array.
 " Maintainer: Hongli Gao <left.slipper at gmail dot com>
-" Last Change: 2008 April 12
+" Last Change: 2009 August 27
 "
 " USAGE:
 " Copy this file to your vim's plugin folder.
@@ -141,8 +141,9 @@ fun! Save_signs_to_file()
   for item in s:mylist
     let tempList = tempList + [item[0] . "#" . item[1]. "#" . item[2]]
   endfor
-  let writeFlag = writefile(tempList, s:outputFileName)
-
+  if exists("g:Signs_file_path_corey")
+      let writeFlag = writefile(tempList, s:outputFileName)
+  endif
 endfun
 " ---------------------------------------------------------------------
 " Load_signs_from_file
@@ -201,9 +202,11 @@ endfun
 fun! s:Flash_signs()
 
   silent! exe 'sign unplace *'
+  silent! exe 'sign undefine *'
   if len(s:mylist) > 1
     for item in s:mylist
       silent! exe 'sign define CS' . item[0] . ' text='. item[0] .' texthl=ErrorMsg'
+      silent! exe 'badd ' . item[2]
       silent! exe 'sign place ' . item[0] . ' line=' . item[1] . ' name=CS'. item[0] . ' file=' . item[2]
     endfor
   endif
